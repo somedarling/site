@@ -1,1 +1,43 @@
 
+name: Deploy Neocities album
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/album/**'
+      - 'scripts/build-album.py'
+      - '.github/workflows/deploy-neocities-album.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: neocities-album
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate album HTML
+        run: python3 scripts/build-album.py
+      - name: Upload album to Neocities
+        env:
+          NEOCITIES_API_KEY: ${{ secrets.NEOCITIES_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEOCITIES_API_KEY" || { echo 'Missing NEOCITIES_API_KEY secret'; exit 1; }
+          upload() {
+            local remote="$1" localfile="$2" response
+            response=$(curl --fail-with-body --retry 3 --retry-delay 3 --silent --show-error \
+              -H "Authorization: Bearer $NEOCITIES_API_KEY" \
+              -F "${remote}=@${localfile}" https://neocities.org/api/upload)
+            echo "$response" | python3 -c 'import json,sys; x=json.load(sys.stdin); assert x.get("result")=="success", x'
+            echo "Uploaded: $remote"
+          }
+          upload 'album/index.html' 'public/album/index.html'
+          mkdir -p public/album/images
+          while IFS= read -r -d '' file; do
+            remote="album/${file#public/album/}"
+            upload "$remote" "$file"
+          done < <(find public/album/images -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.gif' -o -iname '*.webp' \) -print0 | sort -z)
