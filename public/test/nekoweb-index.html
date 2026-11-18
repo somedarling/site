@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>つれづれメモ帳</title><style>
+ :root{font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;color:#34443e;background:#f6f8f6}
+ *{box-sizing:border-box}body{margin:0}a{color:#327461}a:hover{text-decoration:none}
+ .site-head{background:#fff;border-bottom:1px solid #dce7df;padding:28px 18px 20px}
+ .head-inner,.wrap{max-width:1050px;margin:auto}.site-head h1{font-size:1.65rem;margin:0 0 6px;letter-spacing:.035em}
+ .sub{color:#73847c;font-size:.9rem;margin:0;line-height:1.7}
+ .wrap{padding:22px 14px 70px;display:grid;grid-template-columns:minmax(0,1fr) 235px;gap:22px;align-items:start}
+ .toolbar,.article,.side,.blank{background:#fff;border:1px solid #e1e9e3;border-radius:10px;padding:17px;margin-bottom:15px}
+ .toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+ input,select,button{font:inherit;border:1px solid #c7d9cd;border-radius:7px;padding:9px;background:#fff;color:inherit}
+ input{flex:1;min-width:145px}button{cursor:pointer;background:#eaf4ee;color:#315c48}button:hover{background:#d9ece0}
+ .article{overflow-wrap:anywhere;line-height:1.9}
+ .date{color:#718178;font-size:.83rem}.article h2{font-size:1.16rem;margin:8px 0 12px;line-height:1.5}
+ .article h2 a{text-decoration:none;color:#34443e}.article h2 a:hover{text-decoration:underline}.article-images{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:14px 0}.article-images img{width:100%;max-height:450px;object-fit:contain;border-radius:8px;background:#f6f8f6}
+ .body{white-space:pre-wrap;line-height:1.95}.pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+ .pill{border:1px solid #dce9e0;border-radius:30px;padding:2px 9px;font-size:.76rem;color:#537565}
+ .side h3{font-size:1rem;margin:0 0 12px}.side button{display:block;width:100%;text-align:left;margin:5px 0;background:#fff}
+ .side button:hover{background:#eef6f0}.side .group{margin-bottom:20px}
+ .pager{display:flex;justify-content:center;align-items:center;gap:12px;margin:22px 0}.pager button:disabled{opacity:.4;cursor:default}
+ .album{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:13px}
+ .album .article{margin:0}.album .body{max-height:200px;overflow:hidden}
+ .back{display:inline-block;margin-bottom:12px}.muted{color:#72837a}
+ @media(max-width:730px){.wrap{display:flex;flex-direction:column}.main-col,.side{width:100%}.side{order:2}.site-head{padding:22px 16px}.toolbar{padding:12px}.article{padding:15px}}
+ </style></head><body><header class="site-head"><div class="head-inner"><h1>つれづれメモ帳</h1><p class="sub">日々のこと、制作のこと、思いついたこと。</p></div></header><div class="wrap"><main class="main-col"><div class="toolbar" id="toolbar"><input id="search" type="search" placeholder="投稿を検索" aria-label="投稿を検索"><span class="muted" id="filterState"></span></div><div id="content"></div><nav id="pager" class="pager"><button id="prev">← 前へ</button><span id="pageNumber"></span><button id="next">次へ →</button></nav></main><aside id="sidebar" class="side" aria-label="アーカイブ"></aside></div><script type="application/json" id="post-data">[]</script><script>
+ 'use strict';
+ const POSTS=JSON.parse(document.getElementById('post-data').textContent);
+ const ALBUM=false;
+ const PAGE_SIZE=10;
+ const $=id=>document.getElementById(id);
+ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const date=s=>new Date(s).toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'});
+ let page=1,category='',month='',search='';
+ function monthKey(s){return String(s).slice(0,7)}
+ function linkTo(id){return '#post='+encodeURIComponent(id)}
+ function article(p){
+   const name=p.title||'無題の投稿';
+   return '<article class="article"><div class="date">'+esc(date(p.created))+'</div>'+
+    '<h2><a href="'+linkTo(p.id)+'">'+esc(name)+'</a></h2>'+
+    (p.content?'<div class="body">'+esc(p.content)+'</div>':'')+
+    (p.images?.length?'<div class="article-images">'+p.images.map(src=>'<img src="'+esc(src)+'" alt="投稿画像" loading="lazy">').join('')+'</div>':'')+
+    '<div class="pills"><span class="pill">'+esc(p.category)+'</span>'+
+    p.tags.map(t=>'<span class="pill">#'+esc(t)+'</span>').join('')+'</div></article>';
+ }
+ function setFilter(type,value){if(type==='category')category=value;if(type==='month')month=value;page=1;location.hash='';render()}
+ function renderSidebar(){
+   const categories=[...new Set(POSTS.map(p=>p.category))].sort();
+   const months=[...new Set(POSTS.map(p=>monthKey(p.created)))].sort().reverse();
+   const group=(title,items,type)=>'<div class="group"><h3>'+title+'</h3>'+
+    items.map(x=>'<button type="button" data-type="'+type+'" data-value="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div>';
+   $('sidebar').innerHTML=group('カテゴリー',['すべて',...categories],'category')+
+    group('月別アーカイブ',['すべて',...months],'month');
+   $('sidebar').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setFilter(b.dataset.type,b.dataset.value==='すべて'?'':b.dataset.value)));
+ }
+ function render(){
+   const match=location.hash.match(/^#post=(.*)$/);
+   const id=match?decodeURIComponent(match[1]):null;
+   const detail=id?POSTS.find(p=>p.id===id):null;
+   $('toolbar').hidden=!!detail;
+   $('pager').hidden=!!detail;
+   if(detail){
+     $('content').className='';
+     $('content').innerHTML='<a class="back" href="#">← 一覧へ戻る</a>'+article(detail);
+     document.title=(detail.title||'無題の投稿')+' | '+"つれづれメモ帳";
+     return;
+   }
+   document.title="つれづれメモ帳";
+   const filtered=POSTS.filter(p=>(!category||p.category===category)&&(!month||monthKey(p.created)===month)&&(!search||(p.title+' '+p.content+' '+p.tags.join(' ')).toLocaleLowerCase().includes(search)));
+   const total=Math.max(1,Math.ceil(filtered.length/PAGE_SIZE));page=Math.min(page,total);
+   $('content').className=ALBUM?'album':'';
+   $('content').innerHTML=filtered.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE).map(article).join('')||'<div class="blank muted">該当する投稿はありません。</div>';
+   $('pageNumber').textContent=page+' / '+total;
+   $('prev').disabled=page<=1;$('next').disabled=page>=total;
+   $('filterState').textContent=[category,month].filter(Boolean).join(' / ');
+ }
+ $('search').addEventListener('input',e=>{search=e.target.value.trim().toLocaleLowerCase();page=1;render()});
+ $('prev').addEventListener('click',()=>{page--;render();window.scrollTo(0,0)});
+ $('next').addEventListener('click',()=>{page++;render();window.scrollTo(0,0)});
+ window.addEventListener('hashchange',render);
+ renderSidebar();render();
+ </script></body></html>
