@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>つれづれメモ帳</title><style>
+ :root{font-family:"Yu Mincho","Hiragino Mincho ProN","Hiragino Mincho Pro",Georgia,serif;color:#615955;background:#efe6d9}
+ *{box-sizing:border-box}
+ body{margin:0;min-height:100vh;background-color:#efe6d9;background-image:radial-gradient(circle at 17% 13%,#b4a99a44 0 1px,transparent 1.5px),radial-gradient(circle at 79% 61%,#97b5b744 0 1px,transparent 1.6px),radial-gradient(circle at 54% 82%,#fffaf577 0 2px,transparent 3px);background-size:131px 149px,197px 223px,89px 103px}
+ a{color:#615955;text-decoration:underline;text-underline-offset:.16em}a:hover{color:#397f82}
+ .site-head{max-width:1020px;margin:0 auto;padding:34px 22px 25px;text-align:center}
+ .head-inner,.wrap{max-width:1020px;margin:auto}
+ .site-head h1{font-family:"Yu Mincho","Hiragino Mincho ProN",Georgia,serif;font-size:clamp(1.65rem,5vw,2.2rem);margin:0 0 13px;letter-spacing:.11em;font-weight:700;color:#5c5451}
+ .sub{color:#77706c;font-size:.88rem;margin:0;line-height:1.9}
+ .wrap{padding:15px 22px 75px;display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:23px;align-items:start}
+ .toolbar,.article,.side,.blank{background:#fffaf0b8;border:0;border-radius:0;padding:25px 28px;margin-bottom:22px;box-shadow:none}
+ .toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;padding:15px 17px;background:#9bc4c3c9}
+ input,select,button{font:inherit;border:1px solid #b8aaa0;border-radius:2px;padding:10px;background:#fffaf0ed;color:#615955}
+ input{flex:1;min-width:145px}button{cursor:pointer;background:#d6e7e4;color:#58534f}button:hover{background:#b4d5d2}
+ .article{overflow-wrap:anywhere;line-height:2.05}
+ .date{color:#827771;font-size:.85rem;letter-spacing:.07em}
+ .article h2{font-size:1.24rem;margin:10px 0 18px;line-height:1.6;font-weight:700;color:#5c5451}
+ .article h2 a{color:#5c5451;text-decoration:none}.article h2 a:hover{text-decoration:underline}
+ .article-images{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:16px 0}
+ .article-images img{width:100%;max-height:500px;object-fit:contain;border-radius:0;background:#f6f0e6}
+ .body{white-space:pre-wrap;line-height:2.05;overflow-wrap:anywhere}
+ .pills{display:flex;gap:7px;flex-wrap:wrap;margin-top:18px}
+ .pill{background:linear-gradient(transparent 45%,#a2cbcaad 45%);border:0;border-radius:0;padding:3px 7px;font-size:.78rem;color:#615955}
+ .side h3{font-size:1rem;margin:0 0 12px;color:#5c5451;background:linear-gradient(transparent 55%,#a2cbca 55%);display:inline}
+ .side button{display:block;width:100%;text-align:left;margin:6px 0;background:transparent;border:0;padding:5px}
+ .side button:hover{background:#b4d5d255}.side .group{margin-bottom:20px}
+ .pager{display:flex;justify-content:center;align-items:center;gap:12px;margin:22px 0}.pager button:disabled{opacity:.4;cursor:default}
+ .album{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+ .album .article{margin:0}.album .body{max-height:200px;overflow:hidden}
+ .back{display:inline-block;margin-bottom:12px}.muted{color:#80746e}
+ @media(max-width:730px){.wrap{display:flex;flex-direction:column;padding:12px 22px 65px}.main-col,.side{width:100%}.side{order:2}.site-head{padding:23px 18px}.toolbar{padding:12px}.article{padding:23px 20px}}
+ </style></head><body><header class="site-head"><div class="head-inner"><h1>つれづれメモ帳</h1><p class="sub">日々のこと、制作のこと、思いついたこと。</p></div></header><div class="wrap"><main class="main-col"><div class="toolbar" id="toolbar"><input id="search" type="search" placeholder="投稿を検索" aria-label="投稿を検索"><span class="muted" id="filterState"></span></div><div id="content"></div><nav id="pager" class="pager"><button id="prev">← 前へ</button><span id="pageNumber"></span><button id="next">次へ →</button></nav></main><aside id="sidebar" class="side" aria-label="アーカイブ"></aside></div><script type="application/json" id="post-data">[]</script><script>
+ 'use strict';
+ const POSTS=JSON.parse(document.getElementById('post-data').textContent);
+ const ALBUM=false;
+ const PAGE_SIZE=10;
+ const $=id=>document.getElementById(id);
+ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const date=s=>new Date(s).toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'});
+ let page=1,category='',month='',search='';
+ function monthKey(s){return String(s).slice(0,7)}
+ function linkTo(id){return '#post='+encodeURIComponent(id)}
+ function article(p){
+   const name=p.title||'無題の投稿';
+   return '<article class="article"><div class="date">'+esc(date(p.created))+'</div>'+
+    '<h2><a href="'+linkTo(p.id)+'">'+esc(name)+'</a></h2>'+
+    (p.content?'<div class="body">'+esc(p.content)+'</div>':'')+
+    (p.images?.length?'<div class="article-images">'+p.images.map(src=>'<img src="'+esc(src)+'" alt="投稿画像" loading="lazy">').join('')+'</div>':'')+
+    '<div class="pills"><span class="pill">'+esc(p.category)+'</span>'+
+    p.tags.map(t=>'<span class="pill">#'+esc(t)+'</span>').join('')+'</div></article>';
+ }
+ function setFilter(type,value){if(type==='category')category=value;if(type==='month')month=value;page=1;location.hash='';render()}
+ function renderSidebar(){
+   const categories=[...new Set(POSTS.map(p=>p.category))].sort();
+   const months=[...new Set(POSTS.map(p=>monthKey(p.created)))].sort().reverse();
+   const group=(title,items,type)=>'<div class="group"><h3>'+title+'</h3>'+
+    items.map(x=>'<button type="button" data-type="'+type+'" data-value="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div>';
+   $('sidebar').innerHTML=group('カテゴリー',['すべて',...categories],'category')+
+    group('月別アーカイブ',['すべて',...months],'month');
+   $('sidebar').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setFilter(b.dataset.type,b.dataset.value==='すべて'?'':b.dataset.value)));
+ }
+ function render(){
+   const match=location.hash.match(/^#post=(.*)$/);
+   const id=match?decodeURIComponent(match[1]):null;
+   const detail=id?POSTS.find(p=>p.id===id):null;
+   $('toolbar').hidden=!!detail;
+   $('pager').hidden=!!detail;
+   if(detail){
+     $('content').className='';
+     $('content').innerHTML='<a class="back" href="#">← 一覧へ戻る</a>'+article(detail);
+     document.title=(detail.title||'無題の投稿')+' | '+"つれづれメモ帳";
+     return;
+   }
+   document.title="つれづれメモ帳";
+   const filtered=POSTS.filter(p=>(!category||p.category===category)&&(!month||monthKey(p.created)===month)&&(!search||(p.title+' '+p.content+' '+p.tags.join(' ')).toLocaleLowerCase().includes(search)));
+   const total=Math.max(1,Math.ceil(filtered.length/PAGE_SIZE));page=Math.min(page,total);
+   $('content').className=ALBUM?'album':'';
+   $('content').innerHTML=filtered.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE).map(article).join('')||'<div class="blank muted">該当する投稿はありません。</div>';
+   $('pageNumber').textContent=page+' / '+total;
+   $('prev').disabled=page<=1;$('next').disabled=page>=total;
+   $('filterState').textContent=[category,month].filter(Boolean).join(' / ');
+ }
+ $('search').addEventListener('input',e=>{search=e.target.value.trim().toLocaleLowerCase();page=1;render()});
+ $('prev').addEventListener('click',()=>{page--;render();window.scrollTo(0,0)});
+ $('next').addEventListener('click',()=>{page++;render();window.scrollTo(0,0)});
+ window.addEventListener('hashchange',render);
+ renderSidebar();render();
+ </script></body></html>
