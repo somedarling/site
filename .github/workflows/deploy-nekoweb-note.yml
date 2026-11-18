@@ -1,20 +1,19 @@
 name: Deploy Nekoweb note diary
-
 on:
   push:
     branches: [main]
     paths:
-      - 'public/note/index.html'
+      - 'public/note/posts.json'
+      - 'public/note/images/**'
+      - 'scripts/build_note.py'
+      - 'scripts/note-template.html'
       - '.github/workflows/deploy-nekoweb-note.yml'
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: nekoweb-note-deploy
   cancel-in-progress: false
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -22,57 +21,38 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Validate note HTML
-        run: |
-          test -s public/note/index.html
-          test "$(wc -c < public/note/index.html)" -le 10000000
-
-      - name: Upload and verify Nekoweb note
+      - name: Generate note page from JSON
+        run: python3 scripts/build_note.py
+      - name: Upload images and HTML to Nekoweb
         env:
           NEKOWEB_API_KEY: ${{ secrets.NEKOWEB_API_KEY }}
+        shell: bash
         run: |
           set -euo pipefail
-
-          if [ -z "${NEKOWEB_API_KEY:-}" ]; then
-            echo 'Missing NEKOWEB_API_KEY' >&2
-            exit 1
+          test -n "${NEKOWEB_API_KEY:-}" || { echo 'Missing API key' >&2; exit 1; }
+          upload() {
+            local folder="$1" file="$2"
+            local response
+            response=$(mktemp)
+            curl --fail-with-body --show-error --silent --retry 2 \
+              --request POST 'https://nekoweb.org/api/files/upload' \
+              --header "Authorization: ${NEKOWEB_API_KEY}" \
+              --form "pathname=${folder}" \
+              --form "files=@${file};filename=$(basename "$file")" \
+              --output "$response"
+            if ! grep -q 'Files uploaded' "$response"; then
+              echo "Unexpected upload response for ${file}:" >&2
+              cat "$response" >&2
+              exit 1
+            fi
+            rm -f "$response"
+            echo "Uploaded: ${file}"
+          }
+          if compgen -G 'public/note/images/*' > /dev/null; then
+            for file in public/note/images/*; do
+              test -f "$file" || continue
+              upload '/4ki.nekoweb.org/note/images' "$file"
+            done
           fi
-
-          echo 'Uploading note/index.html...'
-
-          curl --fail-with-body --show-error --silent \
-            --request POST \
-            'https://nekoweb.org/api/files/upload' \
-            --header "Authorization: ${NEKOWEB_API_KEY}" \
-            --form 'pathname=/4ki.nekoweb.org/note' \
-            --form 'files=@public/note/index.html;filename=index.html;type=text/html' \
-            --output /tmp/upload-response.txt
-
-          echo 'Upload response:'
-          cat /tmp/upload-response.txt
-          echo
-
-          if ! grep -Fxq 'Files uploaded' /tmp/upload-response.txt; then
-            echo 'Unexpected upload response' >&2
-            exit 1
-          fi
-
-          echo 'Checking /note folder...'
-
-          curl --fail-with-body --show-error --silent \
-            --get 'https://nekoweb.org/api/files/readfolder' \
-            --header "Authorization: ${NEKOWEB_API_KEY}" \
-            --data-urlencode 'pathname=/4ki.nekoweb.org/note' \
-            --output /tmp/note-folder.json
-
-          python3 - <<'PY'
-          import json
-          with open('/tmp/note-folder.json', encoding='utf-8') as f:
-              files = json.load(f)
-          names = [item['name'] for item in files]
-          print('Files in /note:', names)
-          if 'index.html' not in names:
-              raise SystemExit('ERROR: index.html not found in /note')
-          print('SUCCESS: note/index.html exists on Nekoweb')
-          PY
+          upload '/4ki.nekoweb.org/note' 'public/note/index.html'
+          echo 'Upload requests completed.'
