@@ -8,9 +8,9 @@
 </style>
 </head>
 <body><main>
-<header><h1>🌿 site 管理室</h1><p class="note">日記とアルバムの共通投稿システム・試作版 v0.2</p></header>
+<header><h1>🌿 site 管理室</h1><p class="note">日記とアルバムの共通投稿システム・試作版 v0.3</p></header>
 <div class="warning"><strong>現在はローカル試作版です。</strong> 投稿はこのブラウザ内だけに保存され、Nekoweb・Neocitiesには公開されません。別端末や別ブラウザには同期されず、ブラウザデータを消すと投稿も消えます。公開GitHub Pages上では誰でもこの画面を開けるため、秘密の文章やAPIキーは入力しないでください。</div>
-<section class="panel"><h2 id="formTitle">新しい投稿</h2><form id="postForm"><label for="destination">投稿先（将来の公開先）</label><select id="destination"><option value="nekoweb">Nekoweb（日記）</option><option value="neocities">Neocities（アルバム）</option></select><label for="title">タイトル（省略可）</label><input id="title" maxlength="160" placeholder="今日のメモ"><label for="content">本文</label><textarea id="content" placeholder="つらつら書いてみる……"></textarea><div class="actions"><button class="primary" type="submit" id="submitButton">投稿を保存</button><button type="button" id="cancelEdit" hidden>編集をやめる</button></div></form><p id="status" role="status" aria-live="polite"></p></section>
+<section class="panel"><h2 id="formTitle">新しい投稿</h2><form id="postForm"><label for="destination">投稿先（将来の公開先）</label><select id="destination"><option value="nekoweb">Nekoweb（日記）</option><option value="neocities">Neocities（アルバム）</option></select><label for="title">タイトル（省略可）</label><input id="title" maxlength="160" placeholder="今日のメモ"><label for="category">カテゴリー（省略可）</label><input id="category" maxlength="50" placeholder="日記・落書き・雑記"><label for="tags">タグ（カンマ区切り・省略可）</label><input id="tags" maxlength="300" placeholder="水彩, 制作記録"><label for="content">本文</label><textarea id="content" placeholder="つらつら書いてみる……"></textarea><div class="actions"><button class="primary" type="submit" id="submitButton">投稿を保存</button><button type="button" id="cancelEdit" hidden>編集をやめる</button></div></form><p id="status" role="status" aria-live="polite"></p></section>
 <section class="panel"><h2>投稿一覧</h2><div class="tabs"><label for="filter" style="margin:0;align-self:center">表示先</label><select id="filter" style="width:auto;flex:1;min-width:140px"><option value="all">すべて</option><option value="nekoweb">Nekoweb</option><option value="neocities">Neocities</option></select><label for="layout" style="margin:0;align-self:center">表示</label><select id="layout" style="width:auto;flex:1;min-width:130px"><option value="diary">日記風</option><option value="album">アルバム風</option></select></div><div id="entries"></div></section>
 <section class="panel"><h2>バックアップと公開ページ</h2><p class="note">バックアップには両サイトの投稿をまとめて保存します。読み込みは現在の投稿を置き換えるため、事前にバックアップを取ってください。</p><div class="actions"><button type="button" id="backup">バックアップ（JSON）を保存</button><button type="button" id="restore">バックアップを読み込む</button><input type="file" id="restoreFile" accept=".json,application/json" hidden></div><hr style="border:0;border-top:1px solid #e4ece8;margin:20px 0"><label for="exportTarget">公開用HTMLを作るサイト</label><select id="exportTarget"><option value="nekoweb">Nekoweb（日記風）</option><option value="neocities">Neocities（アルバム風）</option></select><div class="actions"><button type="button" class="primary" id="exportHtml">公開用HTMLを保存</button></div><p class="note">公開用HTMLはダウンロードされるだけです。自動アップロードはまだ行いません。本文は通常の文章として表示し、HTMLコードとして実行しません。</p></section>
 </main><script>
@@ -23,14 +23,120 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(posts));return true;
 function clearForm(){$('postForm').reset();editingId=null;$('formTitle').textContent='新しい投稿';$('submitButton').textContent='投稿を保存';$('cancelEdit').hidden=true;}
 function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}
 function render(){const root=$('entries');root.replaceChildren();const selected=$('filter').value;const list=posts.filter(p=>selected==='all'||p.destination===selected).sort((a,b)=>b.created.localeCompare(a.created));root.className=$('layout').value==='album'?'gallery':'';if(!list.length){root.append(el('p','empty','まだ投稿がありません。'));return;}
-for(const p of list){const article=el('article','entry');article.append(el('div','meta',new Date(p.created).toLocaleString('ja-JP')+' ・ '+(p.destination==='neocities'?'Neocities':'Nekoweb')));if(p.title)article.append(el('h3','',p.title));if(p.content)article.append(el('div','body',p.content));const actions=el('div','actions');const edit=el('button','','編集');edit.type='button';edit.addEventListener('click',()=>{editingId=p.id;$('destination').value=p.destination;$('title').value=p.title;$('content').value=p.content;$('formTitle').textContent='投稿を編集';$('submitButton').textContent='変更を保存';$('cancelEdit').hidden=false;window.scrollTo({top:0,behavior:'smooth'});});const del=el('button','danger','削除');del.type='button';del.addEventListener('click',()=>{if(!confirm('この投稿を削除しますか？'))return;const old=posts;posts=posts.filter(x=>x.id!==p.id);if(!save()){posts=old;return;}if(editingId===p.id)clearForm();$('status').textContent='投稿を削除しました。';render();});actions.append(edit,del);article.append(actions);root.append(article);}}
-$('postForm').addEventListener('submit',event=>{event.preventDefault();const title=$('title').value.trim(),content=$('content').value.trim(),destination=$('destination').value;if(!title&&!content){$('status').textContent='タイトルか本文を入力してください。';return;}const previous=posts.map(p=>({...p}));if(editingId){const p=posts.find(x=>x.id===editingId);if(!p)return;p.title=title;p.content=content;p.destination=destination;p.updated=new Date().toISOString();}else{posts.push({id:(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random()),title,content,destination,created:new Date().toISOString()});}if(!save()){posts=previous;return;}clearForm();$('status').textContent='ブラウザ内に保存しました（まだ公開されていません）。';render();});
+for(const p of list){const article=el('article','entry');article.append(el('div','meta',new Date(p.created).toLocaleString('ja-JP')+' ・ '+(p.destination==='neocities'?'Neocities':'Nekoweb')));if(p.title)article.append(el('h3','',p.title));if(p.content)article.append(el('div','body',p.content));const actions=el('div','actions');const edit=el('button','','編集');edit.type='button';edit.addEventListener('click',()=>{editingId=p.id;$('destination').value=p.destination;$('title').value=p.title;$('content').value=p.content;$('category').value=p.category||'';$('tags').value=(p.tags||[]).join(', ');$('formTitle').textContent='投稿を編集';$('submitButton').textContent='変更を保存';$('cancelEdit').hidden=false;window.scrollTo({top:0,behavior:'smooth'});});const del=el('button','danger','削除');del.type='button';del.addEventListener('click',()=>{if(!confirm('この投稿を削除しますか？'))return;const old=posts;posts=posts.filter(x=>x.id!==p.id);if(!save()){posts=old;return;}if(editingId===p.id)clearForm();$('status').textContent='投稿を削除しました。';render();});actions.append(edit,del);article.append(actions);root.append(article);}}
+$('postForm').addEventListener('submit',event=>{event.preventDefault();const title=$('title').value.trim(),content=$('content').value.trim(),destination=$('destination').value,category=$('category').value.trim(),tags=$('tags').value.split(/[,、，]/).map(s=>s.trim()).filter(Boolean).slice(0,20);if(!title&&!content){$('status').textContent='タイトルか本文を入力してください。';return;}const previous=posts.map(p=>({...p}));if(editingId){const p=posts.find(x=>x.id===editingId);if(!p)return;p.title=title;p.content=content;p.destination=destination;p.category=category;p.tags=tags;p.updated=new Date().toISOString();}else{posts.push({id:(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random()),title,content,destination,category,tags,created:new Date().toISOString()});}if(!save()){posts=previous;return;}clearForm();$('status').textContent='ブラウザ内に保存しました（まだ公開されていません）。';render();});
 function downloadFile(name,content,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function validPost(p){return p&&typeof p==='object'&&!Array.isArray(p)&&typeof p.id==='string'&&p.id.length>0&&p.id.length<=200&&typeof p.title==='string'&&p.title.length<=160&&typeof p.content==='string'&&p.content.length<=100000&&['nekoweb','neocities'].includes(p.destination)&&typeof p.created==='string'&&!Number.isNaN(Date.parse(p.created))&&(!p.updated||typeof p.updated==='string');}
+function validPost(p){return p&&typeof p==='object'&&!Array.isArray(p)&&typeof p.id==='string'&&p.id.length>0&&p.id.length<=200&&typeof p.title==='string'&&p.title.length<=160&&typeof p.content==='string'&&p.content.length<=100000&&['nekoweb','neocities'].includes(p.destination)&&typeof p.created==='string'&&!Number.isNaN(Date.parse(p.created))&&(!p.updated||typeof p.updated==='string')&&(!p.category||typeof p.category==='string')&&(!p.tags||(Array.isArray(p.tags)&&p.tags.every(t=>typeof t==='string')));}
 $('backup').addEventListener('click',()=>{const data={format:'site-manager-backup',version:1,exportedAt:new Date().toISOString(),posts};downloadFile('site-backup-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(data,null,2),'application/json;charset=utf-8');$('status').textContent='バックアップを書き出しました。';});
 $('restore').addEventListener('click',()=>$('restoreFile').click());
-$('restoreFile').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{if(file.size>10*1024*1024)throw Error('ファイルが大きすぎます（上限10MB）。');const data=JSON.parse(await file.text());if(!data||data.format!=='site-manager-backup'||data.version!==1||!Array.isArray(data.posts)||data.posts.length>10000||!data.posts.every(validPost)||new Set(data.posts.map(p=>p.id)).size!==data.posts.length)throw Error('対応するバックアップ形式ではありません。');if(!confirm('現在の投稿 '+posts.length+' 件を、バックアップの '+data.posts.length+' 件で置き換えます。続けますか？'))return;const old=posts;posts=data.posts.map(p=>({id:p.id,title:p.title,content:p.content,destination:p.destination,created:p.created,...(p.updated?{updated:p.updated}:{})}));if(!save()){posts=old;return;}clearForm();render();$('status').textContent='バックアップから '+posts.length+' 件を読み込みました。';}catch(err){$('status').textContent='読み込みに失敗しました：'+err.message;}finally{e.target.value='';}});
-$('exportHtml').addEventListener('click',()=>{const target=$('exportTarget').value;const album=target==='neocities';const list=posts.filter(p=>p.destination===target).sort((a,b)=>b.created.localeCompare(a.created));const title=album?'何でも倉庫':'つれづれメモ帳';const articles=list.map(p=>{const date=new Date(p.created).toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'});return '<article class="entry"><time datetime="'+escapeHtml(p.created)+'">'+escapeHtml(date)+'</time>'+(p.title?'<h2>'+escapeHtml(p.title)+'</h2>':'')+(p.content?'<div class="body">'+escapeHtml(p.content)+'</div>':'')+'</article>';}).join('\n');const html='<!doctype html>\n<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title><style>*{box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;margin:0;background:#f7faf8;color:#34433f}main{max-width:900px;margin:auto;padding:30px 16px}h1{font-size:1.7rem}.posts{display:'+(album?'grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px':'block')+'}.entry{background:white;border:1px solid #dce9e4;border-radius:14px;padding:18px;margin:0 0 16px;min-width:0}time{font-size:.8rem;color:#657771}h2{font-size:1.15rem}.body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}</style></head><body><main><h1>'+title+'</h1><div class="posts">'+(articles||'<p>まだ投稿がありません。</p>')+'</div></main></body></html>';downloadFile(target+'-index.html',html,'text/html;charset=utf-8');$('status').textContent=target+'用のHTMLを保存しました（まだサイトには公開されていません）。';});
+$('restoreFile').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{if(file.size>10*1024*1024)throw Error('ファイルが大きすぎます（上限10MB）。');const data=JSON.parse(await file.text());if(!data||data.format!=='site-manager-backup'||data.version!==1||!Array.isArray(data.posts)||data.posts.length>10000||!data.posts.every(validPost)||new Set(data.posts.map(p=>p.id)).size!==data.posts.length)throw Error('対応するバックアップ形式ではありません。');if(!confirm('現在の投稿 '+posts.length+' 件を、バックアップの '+data.posts.length+' 件で置き換えます。続けますか？'))return;const old=posts;posts=data.posts.map(p=>({id:p.id,title:p.title,content:p.content,destination:p.destination,category:p.category||'',tags:p.tags||[],created:p.created,...(p.updated?{updated:p.updated}:{})}));if(!save()){posts=old;return;}clearForm();render();$('status').textContent='バックアップから '+posts.length+' 件を読み込みました。';}catch(err){$('status').textContent='読み込みに失敗しました：'+err.message;}finally{e.target.value='';}});
+
+function createPublicHtml(target){
+ const album=target==='neocities';
+ const list=posts.filter(p=>p.destination===target).sort((a,b)=>b.created.localeCompare(a.created));
+ const siteTitle=album?'何でも倉庫':'つれづれメモ帳';
+ const intro=album?'落書き、絵、文章。気ままにしまっておく場所。':'日々のこと、制作のこと、思いついたこと。';
+ const items=list.map(p=>({
+   id:p.id, title:p.title||'',content:p.content||'',category:p.category||'未分類',
+   tags:Array.isArray(p.tags)?p.tags:[],created:p.created
+ }));
+ // JSON is safely embedded as data, never executable markup.
+ const payload=JSON.stringify(items).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
+ const css=`
+ :root{font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;color:#34443e;background:#f6f8f6}
+ *{box-sizing:border-box}body{margin:0}a{color:#327461}a:hover{text-decoration:none}
+ .site-head{background:#fff;border-bottom:1px solid #dce7df;padding:28px 18px 20px}
+ .head-inner,.wrap{max-width:1050px;margin:auto}.site-head h1{font-size:1.65rem;margin:0 0 6px;letter-spacing:.035em}
+ .sub{color:#73847c;font-size:.9rem;margin:0;line-height:1.7}
+ .wrap{padding:22px 14px 70px;display:grid;grid-template-columns:minmax(0,1fr) 235px;gap:22px;align-items:start}
+ .toolbar,.article,.side,.blank{background:#fff;border:1px solid #e1e9e3;border-radius:10px;padding:17px;margin-bottom:15px}
+ .toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+ input,select,button{font:inherit;border:1px solid #c7d9cd;border-radius:7px;padding:9px;background:#fff;color:inherit}
+ input{flex:1;min-width:145px}button{cursor:pointer;background:#eaf4ee;color:#315c48}button:hover{background:#d9ece0}
+ .article{overflow-wrap:anywhere;line-height:1.9}
+ .date{color:#718178;font-size:.83rem}.article h2{font-size:1.16rem;margin:8px 0 12px;line-height:1.5}
+ .article h2 a{text-decoration:none;color:#34443e}.article h2 a:hover{text-decoration:underline}
+ .body{white-space:pre-wrap;line-height:1.95}.pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+ .pill{border:1px solid #dce9e0;border-radius:30px;padding:2px 9px;font-size:.76rem;color:#537565}
+ .side h3{font-size:1rem;margin:0 0 12px}.side button{display:block;width:100%;text-align:left;margin:5px 0;background:#fff}
+ .side button:hover{background:#eef6f0}.side .group{margin-bottom:20px}
+ .pager{display:flex;justify-content:center;align-items:center;gap:12px;margin:22px 0}.pager button:disabled{opacity:.4;cursor:default}
+ .album{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:13px}
+ .album .article{margin:0}.album .body{max-height:200px;overflow:hidden}
+ .back{display:inline-block;margin-bottom:12px}.muted{color:#72837a}
+ @media(max-width:730px){.wrap{display:flex;flex-direction:column}.main-col,.side{width:100%}.side{order:2}.site-head{padding:22px 16px}.toolbar{padding:12px}.article{padding:15px}}
+ `;
+ const script=`
+ 'use strict';
+ const POSTS=JSON.parse(document.getElementById('post-data').textContent);
+ const ALBUM=${album};
+ const PAGE_SIZE=10;
+ const $=id=>document.getElementById(id);
+ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const date=s=>new Date(s).toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric'});
+ let page=1,category='',month='',search='';
+ function monthKey(s){return String(s).slice(0,7)}
+ function linkTo(id){return '#post='+encodeURIComponent(id)}
+ function article(p){
+   const name=p.title||'無題の投稿';
+   return '<article class="article"><div class="date">'+esc(date(p.created))+'</div>'+
+    '<h2><a href="'+linkTo(p.id)+'">'+esc(name)+'</a></h2>'+
+    (p.content?'<div class="body">'+esc(p.content)+'</div>':'')+
+    '<div class="pills"><span class="pill">'+esc(p.category)+'</span>'+
+    p.tags.map(t=>'<span class="pill">#'+esc(t)+'</span>').join('')+'</div></article>';
+ }
+ function setFilter(type,value){if(type==='category')category=value;if(type==='month')month=value;page=1;location.hash='';render()}
+ function renderSidebar(){
+   const categories=[...new Set(POSTS.map(p=>p.category))].sort();
+   const months=[...new Set(POSTS.map(p=>monthKey(p.created)))].sort().reverse();
+   const group=(title,items,type)=>'<div class="group"><h3>'+title+'</h3>'+
+    items.map(x=>'<button type="button" data-type="'+type+'" data-value="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div>';
+   $('sidebar').innerHTML=group('カテゴリー',['すべて',...categories],'category')+
+    group('月別アーカイブ',['すべて',...months],'month');
+   $('sidebar').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setFilter(b.dataset.type,b.dataset.value==='すべて'?'':b.dataset.value)));
+ }
+ function render(){
+   const match=location.hash.match(/^#post=(.*)$/);
+   const id=match?decodeURIComponent(match[1]):null;
+   const detail=id?POSTS.find(p=>p.id===id):null;
+   $('toolbar').hidden=!!detail;
+   $('pager').hidden=!!detail;
+   if(detail){
+     $('content').className='';
+     $('content').innerHTML='<a class="back" href="#">← 一覧へ戻る</a>'+article(detail);
+     document.title=(detail.title||'無題の投稿')+' | '+${JSON.stringify(siteTitle)};
+     return;
+   }
+   document.title=${JSON.stringify(siteTitle)};
+   const filtered=POSTS.filter(p=>(!category||p.category===category)&&(!month||monthKey(p.created)===month)&&(!search||(p.title+' '+p.content+' '+p.tags.join(' ')).toLocaleLowerCase().includes(search)));
+   const total=Math.max(1,Math.ceil(filtered.length/PAGE_SIZE));page=Math.min(page,total);
+   $('content').className=ALBUM?'album':'';
+   $('content').innerHTML=filtered.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE).map(article).join('')||'<div class="blank muted">該当する投稿はありません。</div>';
+   $('pageNumber').textContent=page+' / '+total;
+   $('prev').disabled=page<=1;$('next').disabled=page>=total;
+   $('filterState').textContent=[category,month].filter(Boolean).join(' / ');
+ }
+ $('search').addEventListener('input',e=>{search=e.target.value.trim().toLocaleLowerCase();page=1;render()});
+ $('prev').addEventListener('click',()=>{page--;render();window.scrollTo(0,0)});
+ $('next').addEventListener('click',()=>{page++;render();window.scrollTo(0,0)});
+ window.addEventListener('hashchange',render);
+ renderSidebar();render();
+ `;
+ return '<!doctype html>\n<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+  '<title>'+escapeHtml(siteTitle)+'</title><style>'+css+'</style></head><body>'+
+  '<header class="site-head"><div class="head-inner"><h1>'+escapeHtml(siteTitle)+'</h1><p class="sub">'+escapeHtml(intro)+'</p></div></header>'+
+  '<div class="wrap"><main class="main-col"><div class="toolbar" id="toolbar"><input id="search" type="search" placeholder="投稿を検索" aria-label="投稿を検索"><span class="muted" id="filterState"></span></div>'+
+  '<div id="content"></div><nav id="pager" class="pager"><button id="prev">← 前へ</button><span id="pageNumber"></span><button id="next">次へ →</button></nav></main>'+
+  '<aside id="sidebar" class="side" aria-label="アーカイブ"></aside></div>'+
+  '<script type="application/json" id="post-data">'+payload+'</scr'+'ipt>'+
+  '<script>'+script+'</scr'+'ipt></body></html>';
+}
+$('exportHtml').addEventListener('click',()=>{
+ const target=$('exportTarget').value;
+ downloadFile(target+'-index.html',createPublicHtml(target),'text/html;charset=utf-8');
+ $('status').textContent=target+'用のHTMLを保存しました（まだサイトには公開されていません）。';
+});
+
 $('cancelEdit').addEventListener('click',clearForm);$('filter').addEventListener('change',render);$('layout').addEventListener('change',render);render();
 </script></body></html>
