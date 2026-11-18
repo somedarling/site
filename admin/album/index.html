@@ -7,6 +7,8 @@
 'use strict';
 const OWNER='somedarling',REPO='site',BRANCH='main',DATA='public/album/items.json',DIR='public/album/images',KEY='yomoyomo_album_pat';
 const $=id=>document.getElementById(id);let token='',items=[],sha='',busy=false,editingId=null;
+// 管理画面はGitHub Pages上にあるため、Neocitiesの画像を外部参照せずGitHub上の元画像を表示する。
+function previewUrl(path){const parts=String(path||'').split('/');if(parts.length!==2||parts[0]!=='images'||!/^[-a-zA-Z0-9_.]+$/.test(parts[1])||parts[1].startsWith('.'))return '';return 'https://raw.githubusercontent.com/'+OWNER+'/'+REPO+'/'+BRANCH+'/public/album/images/'+encodeURIComponent(parts[1])}
 function status(s,error=false){$('status').textContent=s;$('status').classList.toggle('error',error)}
 function base64Utf8(s){const b=new TextEncoder().encode(s);let out='';for(let i=0;i<b.length;i+=8192)out+=String.fromCharCode(...b.subarray(i,i+8192));return btoa(out)}
 function decodeUtf8(s){return new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g,'')),c=>c.charCodeAt(0)))}
@@ -32,7 +34,7 @@ function editItem(id){
   editingId=id;
   $('editor-heading').textContent='2. 画像の情報を編集';
   $('edit-note').classList.remove('hidden');
-  $('edit-preview').src='https://4ki.neocities.org/album/'+p.path;
+  $('edit-preview').src=previewUrl(p.path);
   $('edit-preview').classList.remove('hidden');
   $('images').value='';
   $('images').disabled=true;
@@ -47,7 +49,7 @@ function render(){
   const el=$('items');el.replaceChildren();
   for(const p of [...items].reverse()){
     const div=document.createElement('div');div.className='item';
-    const img=document.createElement('img');img.src='https://4ki.neocities.org/album/'+p.path;img.alt='登録画像';img.loading='lazy';
+    const img=document.createElement('img');img.src=previewUrl(p.path);img.alt='登録画像';img.loading='lazy';
     const label=document.createElement('span');label.className='item-label';label.textContent=(p.title||'無題')+'　'+(p.created||'').slice(0,10);
     const actions=document.createElement('div');actions.className='item-actions';
     const editBtn=document.createElement('button');editBtn.type='button';editBtn.className='secondary';editBtn.textContent='編集';editBtn.onclick=()=>editItem(p.id);
