@@ -45,7 +45,7 @@ jobs:
             --request POST \
             'https://nekoweb.org/api/files/upload' \
             --header "Authorization: ${NEKOWEB_API_KEY}" \
-            --form 'pathname=/note' \
+            --form 'pathname=/4ki.nekoweb.org/note' \
             --form 'files=@public/note/index.html;filename=index.html;type=text/html' \
             --output /tmp/upload-response.txt
 
@@ -63,7 +63,7 @@ jobs:
           curl --fail-with-body --show-error --silent \
             --get 'https://nekoweb.org/api/files/readfolder' \
             --header "Authorization: ${NEKOWEB_API_KEY}" \
-            --data-urlencode 'pathname=/note' \
+            --data-urlencode 'pathname=/4ki.nekoweb.org/note' \
             --output /tmp/note-folder.json
 
           python3 - <<'PY'
