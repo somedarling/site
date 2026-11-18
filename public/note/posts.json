@@ -22,16 +22,5 @@
     "images": [
       "images/post-mwlky4io-rebsue-mwlky4ip-0.jpg"
     ]
-  },
-  {
-    "id": "hello-note-20261118",
-    "created": "2026-11-18T03:00:00.000Z",
-    "title": "日記の動作確認",
-    "content": "記事データからページを自動生成するテストでヤンス。表示を確認したら、この投稿は削除して構いません。\n\n↑子分の投稿",
-    "category": "テスト",
-    "tags": [
-      "動作確認"
-    ],
-    "images": []
   }
 ]
