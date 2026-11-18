@@ -1,1 +1,44 @@
+name: Deploy Nekoweb test diary
 
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/test/index.html'
+      - '.github/workflows/deploy-nekoweb-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nekoweb-test-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Validate target file
+        run: |
+          test -s public/test/index.html
+          test "$(wc -c < public/test/index.html)" -le 10000000
+      - name: Upload only test/index.html to Nekoweb
+        env:
+          NEKOWEB_API_KEY: ${{ secrets.NEKOWEB_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NEKOWEB_API_KEY:-}" ]; then
+            echo 'Missing NEKOWEB_API_KEY repository secret' >&2
+            exit 1
+          fi
+          curl --fail-with-body --show-error --silent --retry 2 \
+            --request POST 'https://nekoweb.org/api/files/upload' \
+            --header "Authorization: ${NEKOWEB_API_KEY}" \
+            --form 'pathname=/test' \
+            --form 'files=@public/test/index.html;filename=index.html;type=text/html' \
+            --output /tmp/nekoweb-upload-response.txt
+          echo 'Nekoweb test page upload completed.'
