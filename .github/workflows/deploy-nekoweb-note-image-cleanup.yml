@@ -1,0 +1,100 @@
+name: Deploy Nekoweb note diary
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/note/posts.json'
+      - 'public/note/images/**'
+      - 'scripts/build_note.py'
+      - 'scripts/note-template.html'
+      - '.github/workflows/deploy-nekoweb-note.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: nekoweb-note-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate note page from JSON
+        run: python3 scripts/build_note.py
+      - name: Upload images and HTML to Nekoweb
+        env:
+          NEKOWEB_API_KEY: ${{ secrets.NEKOWEB_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${NEKOWEB_API_KEY:-}" || { echo 'Missing API key' >&2; exit 1; }
+          upload() {
+            local folder="$1" file="$2"
+            local response
+            response=$(mktemp)
+            curl --fail-with-body --show-error --silent --retry 2 \
+              --request POST 'https://nekoweb.org/api/files/upload' \
+              --header "Authorization: ${NEKOWEB_API_KEY}" \
+              --form "pathname=${folder}" \
+              --form "files=@${file};filename=$(basename "$file")" \
+              --output "$response"
+            if ! grep -q 'Files uploaded' "$response"; then
+              echo "Unexpected upload response for ${file}:" >&2
+              cat "$response" >&2
+              exit 1
+            fi
+            rm -f "$response"
+            echo "Uploaded: ${file}"
+          }
+          if compgen -G 'public/note/images/*' > /dev/null; then
+            for file in public/note/images/*; do
+              test -f "$file" || continue
+              upload '/4ki.nekoweb.org/note/images' "$file"
+            done
+          fi
+          upload '/4ki.nekoweb.org/note' 'public/note/index.html'
+          echo 'Upload requests completed.'
+      - name: Remove deleted images from Nekoweb
+        if: github.event_name == 'push'
+        env:
+          NEKOWEB_API_KEY: ${{ secrets.NEKOWEB_API_KEY }}
+          BEFORE_SHA: ${{ github.event.before }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only process files actually deleted in the triggering Git push.
+          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
+            echo 'No previous commit; skipping deletion.'
+            exit 0
+          fi
+          git cat-file -e "${BEFORE_SHA}^{commit}"
+          while IFS= read -r -d '' file; do
+            filename="${file##*/}"
+            # Guard against deleting other folders or unexpected names.
+            [[ "$file" == public/note/images/* ]] || continue
+            [[ "$filename" =~ ^[A-Za-z0-9_-]+\.(png|jpg|jpeg|webp|gif)$ ]] || continue
+            # Do not delete a file that reappeared in the current checkout.
+            [[ ! -e "$file" ]] || continue
+            echo "Removing published image: $filename"
+            response=$(mktemp)
+            if ! curl --fail-with-body --silent --show-error --retry 2 \
+              --request POST 'https://nekoweb.org/api/files/delete' \
+              --header "Authorization: ${NEKOWEB_API_KEY}" \
+              --data-urlencode "pathname=/4ki.nekoweb.org/note/images/${filename}" \
+              --output "$response"; then
+              cat "$response" >&2
+              rm -f "$response"
+              exit 1
+            fi
+            if ! grep -qi 'deleted' "$response"; then
+              echo 'Unexpected Nekoweb delete response:' >&2
+              cat "$response" >&2
+              rm -f "$response"
+              exit 1
+            fi
+            rm -f "$response"
+          done < <(git diff --name-only --diff-filter=D -z "$BEFORE_SHA" "$GITHUB_SHA" -- public/note/images/)
