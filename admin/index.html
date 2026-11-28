@@ -1,28 +1,98 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>よもよも帳・投稿管理</title><style>
 :root{font-family:system-ui,"Hiragino Kaku Gothic ProN",sans-serif;color:#554f4b;background:#efe6d9}*{box-sizing:border-box}body{margin:0;padding:18px;background:radial-gradient(circle at 12% 25%,#b7b2a340 0 1px,transparent 2px) 0 0/150px 170px,#efe6d9}main{max-width:750px;margin:auto}h1{font-family:serif;font-size:1.65rem}h2{font-size:1.12rem}section{background:#fffaf0d9;padding:19px;margin:16px 0}label{display:block;font-weight:600;margin:12px 0 5px}input,textarea,select,button{font:inherit;color:inherit;border:1px solid #b7aaa0;border-radius:3px;padding:11px;background:#fffdf8;width:100%;max-width:100%}textarea{min-height:190px;resize:vertical}button{cursor:pointer;background:#c3dcda;margin:6px 0}button.secondary{background:#eee8de}button.danger{background:#f0d1c8}button:disabled{opacity:.5}small,.hint{color:#716963;font-size:.85rem;line-height:1.6}.row{display:flex;gap:8px;align-items:center}.row>*{flex:1;min-width:0}.hidden{display:none!important}.status{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:#e4efeb}.error{background:#f5dcd6}.item{border-bottom:1px solid #d9cec3;padding:12px 0}.item strong{display:block}.item button{width:auto;margin-right:8px}.thumb{width:95px;height:95px;object-fit:contain;border:1px solid #ddd}.image-row{display:flex;gap:10px;align-items:center;margin:8px 0;overflow-wrap:anywhere}.image-row button{width:auto}.note{border-left:4px solid #9bc4c3;padding:8px 12px;background:#f5f0e8}
-.remember-row{display:flex;align-items:center;gap:9px;font-weight:500}.remember-row input{width:auto;flex:none;accent-color:#7daead}.home-link{text-decoration:none}.home-link:hover{text-decoration:underline}</style></head><body><main><h1><a href="https://4ki.nekoweb.org/note/" class="home-link" title="公開日記のトップへ">よもよも帳</a> <small>投稿管理</small></h1><p class="note">GitHubの権限を限定したトークンで、記事と画像を直接保存します。記事の削除や画像の取り外しでは、未使用の添付画像を自動的に削除します。通常はトークンを保存しません。「この端末に記憶する」を選んだ場合のみブラウザ内に保存します。<strong>共有端末では使わないでください。</strong></p><section><h2>1. GitHubに接続</h2><label for="token">Fine-grained personal access token</label><input id="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…"><p class="hint">対象リポジトリ：somedarling/site、Repository permissions → Contents: Read and write のみ。トークンは絶対に記事やGitHubのファイルに貼り付けないでください。</p><label class="remember-row"><input id="remember" type="checkbox"> この端末にトークンを記憶する</label><p class="hint">記憶すると次回から入力を省けます。ただし端末やブラウザのデータにアクセスできる人、管理画面で実行された不正なスクリプトに読み取られる危険があります。共有端末では使用しないでください。</p><button id="connect">接続して記事を読み込む</button><button id="forget" class="secondary">保存したトークンを消去</button><button id="disconnect" class="secondary">接続を解除</button><div id="status" class="status" role="status">未接続</div></section><section id="editor" class="hidden"><h2 id="editor-title">2. 新しい記事</h2><label for="title">タイトル（省略可）</label><input id="title"><label for="created">日時</label><input id="created" type="datetime-local"><label for="content">本文</label><textarea id="content"></textarea><label for="category">カテゴリー</label><input id="category" placeholder="日常"><label for="tags">タグ（カンマ区切り）</label><input id="tags" placeholder="制作, 日記"><label for="images">画像を追加（複数選択可）</label><input id="images" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple><p class="hint">画像は1枚あたり最大約4MB（GitHub API経由）。大きな画像はiPhone側で縮小してから選んでください。画像のアップロードは記事保存時に行います。</p><div id="image-list"></div><button id="save">記事を保存して公開</button><button id="reset" class="secondary">新規記事に戻す</button><button id="delete" class="danger hidden">この記事を削除</button></section><section id="listing" class="hidden"><h2>3. 記事一覧</h2><p class="hint">保存後、GitHub ActionsによるNekowebへの反映には少し時間がかかります。</p><div id="items"></div></section><p><a href="https://4ki.nekoweb.org/note/index.html" target="_blank" rel="noopener noreferrer">公開日記を見る</a></p></main><script>
+.remember-row{display:flex;align-items:center;gap:9px;font-weight:500}.remember-row input{width:auto;flex:none;accent-color:#7daead}.home-link{text-decoration:none}.home-link:hover{text-decoration:underline}#note-preview{padding:12px;overflow-wrap:anywhere;white-space:pre-wrap}#note-preview img{max-width:100%;max-height:220px;margin:4px}@media(max-width:480px){button,input,textarea{font-size:16px}button{min-height:44px}#review-note,#save{width:100%}}</style></head><body><main><h1><a href="https://4ki.nekoweb.org/note/" class="home-link" title="公開日記のトップへ">よもよも帳</a> <small>投稿管理</small></h1><p class="note">GitHubの権限を限定したトークンで、記事と画像を直接保存します。記事の削除や画像の取り外しでは、未使用の添付画像を自動的に削除します。通常はトークンを保存しません。「この端末に記憶する」を選んだ場合のみブラウザ内に保存します。<strong>共有端末では使わないでください。</strong></p><section><h2>1. GitHubに接続</h2><label for="token">Fine-grained personal access token</label><input id="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…"><p class="hint">対象リポジトリ：somedarling/site、Repository permissions → Contents: Read and write のみ。トークンは絶対に記事やGitHubのファイルに貼り付けないでください。</p><label class="remember-row"><input id="remember" type="checkbox"> この端末にトークンを記憶する</label><p class="note">保存済みのトークンを端末から消すときは「保存したトークンを消去」を押してください。</p><p class="hint">記憶すると次回から入力を省けます。ただし端末やブラウザのデータにアクセスできる人、管理画面で実行された不正なスクリプトに読み取られる危険があります。共有端末では使用しないでください。</p><button id="connect">接続して記事を読み込む</button><button id="forget" class="secondary">保存したトークンを消去</button><button id="disconnect" class="secondary">接続を解除</button><div id="status" class="status" role="status">未接続</div></section><section id="editor" class="hidden"><h2 id="editor-title">2. 新しい記事</h2><label for="title">タイトル（省略可）</label><input id="title"><label for="created">日時</label><input id="created" type="datetime-local"><label for="content">本文</label><textarea id="content"></textarea><label for="category">カテゴリー</label><input id="category" placeholder="日常"><label for="tags">タグ（カンマ区切り）</label><input id="tags" placeholder="制作, 日記"><label for="images">画像を追加（複数選択可）</label><input id="images" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple><p class="hint">画像は1枚あたり最大約4MB（GitHub API経由）。大きな画像はiPhone側で縮小してから選んでください。画像のアップロードは記事保存時に行います。</p><div id="image-list"></div><button type="button" id="review-note" aria-controls="note-preview" aria-expanded="false">投稿前プレビュー</button><section id="note-preview" hidden></section><button id="save">記事を保存して公開</button><p id="note-save-status" role="status"></p><button id="reset" class="secondary">新規記事に戻す</button><button id="delete" class="danger hidden">この記事を削除</button></section><section id="listing" class="hidden"><h2>3. 記事一覧</h2><p class="hint">保存後、GitHub ActionsによるNekowebへの反映には少し時間がかかります。</p><div id="items"></div></section><p><a href="https://4ki.nekoweb.org/note/index.html" target="_blank" rel="noopener noreferrer">公開日記を見る</a></p></main><script>
 'use strict';
 const OWNER='somedarling',REPO='site',BRANCH='main',POSTPATH='public/note/posts.json',IMAGEDIR='public/note/images';
-const $=id=>document.getElementById(id);const TOKEN_KEY='somedarling-site-admin-token-v1';let token='',posts=[],sha='',editing=null,busy=false;const removed=new Set();
-function getStoredToken(){try{return localStorage.getItem(TOKEN_KEY)||''}catch{return ''}}
+const $=id=>document.getElementById(id);const TOKEN_KEY='somedarling-site-admin-token-v1';let token='',posts=[],sha='',editing=null,busy=false,pending=null;const removed=new Set();
+function getStoredToken(){try{return localStorage.getItem(TOKEN_KEY)||''}catch{return null}}
 function clearStoredToken(){try{localStorage.removeItem(TOKEN_KEY);return true}catch{return false}}
 function saveStoredToken(value){try{localStorage.setItem(TOKEN_KEY,value);return true}catch{return false}}
-function status(msg,err=false){$('status').textContent=msg;$('status').classList.toggle('error',err)}
+function status(msg,err=false){for(const id of ['status','note-save-status']){$(id).textContent=msg;$(id).classList.toggle('error',err)}}
 function errText(e){return e instanceof Error?e.message:String(e)}
 function base64Utf8(str){const bytes=new TextEncoder().encode(str);let s='';for(let i=0;i<bytes.length;i+=8192)s+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(s)}
 function decodeBase64Utf8(s){const binary=atob(s.replace(/\s/g,'')),bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));return new TextDecoder().decode(bytes)}
-async function api(path,method='GET',body){const r=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/'+path+(method==='GET'?'?ref='+BRANCH:''),{method,headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28',...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store'});const data=await r.json().catch(()=>({}));if(!r.ok)throw Error('GitHub '+r.status+': '+(data.message||'通信に失敗しました'));return data}
-function setBusy(v){busy=v;for(const id of ['connect','save','delete'])$(id).disabled=v}
+async function api(path,method='GET',body,raw=false){const r=await fetch('https://api.github.com/repos/'+OWNER+'/'+REPO+'/contents/'+path+(method==='GET'?'?ref='+BRANCH:''),{method,headers:{'Accept':raw?'application/vnd.github.raw+json':'application/vnd.github+json','Authorization':'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28',...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store'});if(!r.ok){const error=new Error('GitHub '+r.status+': '+({401:'トークンを確認してください。',403:'トークンの権限をご確認ください。',409:'記事一覧が更新されました。再試行してください。'}[r.status]||'GitHubへの処理に失敗しました。'));error.status=r.status;throw error}return raw?r.blob():r.json()}
+function setBusy(value){
+ busy=value;
+ for(const id of ['connect','forget','disconnect','save','reset'])$(id).disabled=value;
+ for(const id of ['delete','title','content','created','category','tags','images'])$(id).disabled=value||!!pending;
+ $('save').textContent=pending?'同じ内容で保存を再試行':'記事を保存して公開';
+}
 function isoLocal(d){const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+'T'+z(d.getHours())+':'+z(d.getMinutes())}
 function newPost(){editing=null;removed.clear();$('editor-title').textContent='2. 新しい記事';for(const id of ['title','content','category','tags','images'])$(id).value='';$('created').value=isoLocal(new Date());$('delete').classList.add('hidden');renderImages()}
-function renderImages(){const el=$('image-list');el.replaceChildren();if(editing===null)return;const p=posts.find(x=>x.id===editing);for(const path of (p?.images||[])){if(removed.has(path))continue;const row=document.createElement('div');row.className='image-row';const img=document.createElement('img');img.className='thumb';img.alt='添付画像';img.src='https://'+ '4ki.nekoweb.org/note/'+path;const text=document.createElement('span');text.textContent=path;const btn=document.createElement('button');btn.type='button';btn.className='secondary';btn.textContent='記事から外す';btn.onclick=()=>{removed.add(path);renderImages()};row.append(img,text,btn);el.append(row)}}
-function edit(id){const p=posts.find(x=>x.id===id);if(!p)return;editing=id;removed.clear();$('editor-title').textContent='2. 記事を編集';$('title').value=p.title||'';$('content').value=p.content||'';$('category').value=p.category||'';$('tags').value=(p.tags||[]).join(', ');const d=new Date(p.created);$('created').value=Number.isNaN(d.getTime())?isoLocal(new Date()):isoLocal(d);$('images').value='';$('delete').classList.remove('hidden');renderImages();$('editor').scrollIntoView({behavior:'smooth'})}
+function renderImages(){renderNotePreview();const el=$('image-list');el.replaceChildren();if(editing===null)return;const p=posts.find(x=>x.id===editing);for(const path of (p?.images||[])){if(removed.has(path))continue;const row=document.createElement('div');row.className='image-row';const img=document.createElement('img');img.className='thumb';img.alt='添付画像';img.src='https://'+ '4ki.nekoweb.org/note/'+path;const text=document.createElement('span');text.textContent=path;const btn=document.createElement('button');btn.type='button';btn.className='secondary';btn.textContent='記事から外す';btn.onclick=()=>{if(busy||pending)return;if(busy||pending)return;removed.add(path);renderImages()};row.append(img,text,btn);el.append(row)}}
+function edit(id){if(busy||pending)return;const p=posts.find(x=>x.id===id);if(!p)return;editing=id;removed.clear();$('editor-title').textContent='2. 記事を編集';$('title').value=p.title||'';$('content').value=p.content||'';$('category').value=p.category||'';$('tags').value=(p.tags||[]).join(', ');const d=new Date(p.created);$('created').value=Number.isNaN(d.getTime())?isoLocal(new Date()):isoLocal(d);$('images').value='';$('delete').classList.remove('hidden');renderImages();$('editor').scrollIntoView({behavior:'smooth'})}
 function renderList(){const el=$('items');el.replaceChildren();for(const p of [...posts].sort((a,b)=>String(b.created).localeCompare(String(a.created)))){const box=document.createElement('div');box.className='item';const strong=document.createElement('strong');strong.textContent=p.title||'無題の投稿';const meta=document.createElement('small');meta.textContent=(p.created||'').slice(0,10)+' ・ '+(p.category||'未分類');const btn=document.createElement('button');btn.type='button';btn.textContent='編集';btn.onclick=()=>edit(p.id);box.append(strong,meta,document.createElement('br'),btn);el.append(box)}if(!posts.length)el.textContent='記事はまだありません。'}
-async function load(){const data=await api(POSTPATH);const parsed=JSON.parse(decodeBase64Utf8(data.content));if(!Array.isArray(parsed))throw Error('posts.json の形式が不正です');posts=parsed;sha=data.sha;renderList();$('editor').classList.remove('hidden');$('listing').classList.remove('hidden');newPost();status(posts.length+'件の記事を読み込みました。')}
-$('connect').onclick=async()=>{const value=$('token').value.trim();if(!value){status('トークンを入力してください',true);return}token=value;$('token').value='';setBusy(true);try{await load();if($('remember').checked){if(!saveStoredToken(value))status('接続できましたが、ブラウザにトークンを保存できませんでした。',true)}else{clearStoredToken()}}catch(e){token='';status(errText(e),true)}finally{setBusy(false)}};
+async function load(){const data=await api(POSTPATH);const parsed=JSON.parse(decodeBase64Utf8(data.content));if(!Array.isArray(parsed))throw Error('posts.json の形式が不正です');posts=parsed;sha=data.sha;renderList();$('editor').classList.remove('hidden');$('listing').classList.remove('hidden');if(!pending)newPost();status(pending?'接続しました。同じ内容で再試行できます。':posts.length+'件の記事を読み込みました。')}
+$('connect').onclick=async()=>{
+ if(busy)return;
+ const input=$('token'),remember=$('remember'),value=input.value.trim();
+ if(!value){status('トークンを入力してください',true);return}
+ const shouldRemember=remember.checked;
+ const controls=[input,remember,$('forget'),$('disconnect')];
+ token=value;setBusy(true);
+ for(const control of controls)control.disabled=true;
+ try{
+  await load();
+  if(shouldRemember&&!saveStoredToken(value)){
+   status('接続できましたが、端末に記憶できませんでした。入力欄にトークンを残しています。ブラウザの保存設定をご確認ください。',true);
+   return;
+  }
+  input.value='';
+  if(shouldRemember)status(posts.length+'件の記事を読み込みました。トークンをこの端末に記憶しました。');
+ }catch(e){
+  token='';
+  status('接続できませんでした。入力したトークンは残しています。'+errText(e),true);
+ }finally{
+  for(const control of controls)control.disabled=false;
+  setBusy(false);
+ }
+};
 $('forget').onclick=()=>{const ok=clearStoredToken();$('remember').checked=false;status(ok?'保存済みトークンを消去しました。現在の接続は維持しています。':'保存領域にアクセスできませんでした。',!ok)};
-$('disconnect').onclick=()=>{token='';posts=[];sha='';editing=null;$('token').value='';$('editor').classList.add('hidden');$('listing').classList.add('hidden');status('接続を解除しました。')};
-$('reset').onclick=newPost;
+$('disconnect').onclick=()=>{if(busy||pending)return;token='';posts=[];sha='';editing=null;$('token').value='';$('editor').classList.add('hidden');$('listing').classList.add('hidden');status('接続を解除しました。')};
+let notePreviewUrls=[];
+function draftFields(){
+ const input=$('created').value;
+ const date=new Date(input);
+ return {created:input&&!Number.isNaN(date.getTime())?date.toISOString():null,
+  title:$('title').value.trim(),content:$('content').value,category:$('category').value.trim(),
+  tags:$('tags').value.split(/[,、\n]/).map(value=>value.trim()).filter(Boolean)};
+}
+function renderNotePreview(){
+ const panel=$('note-preview');
+ for(const url of notePreviewUrls)URL.revokeObjectURL(url);
+ notePreviewUrls=[];
+ panel.replaceChildren();
+ if(panel.hidden)return;
+ const fields=pending?.post||draftFields();
+ const heading=document.createElement('h3');
+ heading.textContent=fields.title||'（タイトルなし）';
+ const body=document.createElement('p');
+ body.textContent=fields.content;
+ const metadata=document.createElement('p');
+ metadata.textContent=[fields.created?new Date(fields.created).toLocaleString('ja-JP'):'',fields.category,...fields.tags].filter(Boolean).join(' ・ ');
+ panel.append(heading,metadata,body);
+ const current=posts.find(post=>post.id===editing);
+ const existing=(current?.images||[]).filter(path=>!removed.has(path)&&/^images\/[A-Za-z0-9_.-]+$/.test(path));
+ notePreviewUrls=[...$('images').files].map(file=>URL.createObjectURL(file));
+ for(const src of [...existing.map(path=>'https://raw.githubusercontent.com/'+OWNER+'/'+REPO+'/'+BRANCH+'/public/note/'+path),...notePreviewUrls]){
+  const image=document.createElement('img');image.src=src;image.alt='投稿予定の画像';panel.append(image);
+ }
+}
+$('review-note').onclick=()=>{
+ const panel=$('note-preview');panel.hidden=!panel.hidden;
+ $('review-note').setAttribute('aria-expanded',String(!panel.hidden));
+ renderNotePreview();
+};
+for(const id of ['title','content','created','category','tags','images']){
+ $(id).addEventListener('input',renderNotePreview);
+ if(id==='images')$(id).addEventListener('change',renderNotePreview);
+}
+$('reset').onclick=()=>{
+ if(busy)return;
+ if(pending&&!confirm('再試行を中止して、入力内容をクリアしますか？ 保存先に到達した画像は残る場合があります。'))return;
+ pending=null;newPost();setBusy(false);
+};
 async function fileBase64(file){const buf=await file.arrayBuffer();const bytes=new Uint8Array(buf);let s='';for(let i=0;i<bytes.length;i+=8192)s+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(s)}
 async function writePosts(next,message){const result=await api(POSTPATH,'PUT',{message,content:base64Utf8(JSON.stringify(next,null,2)+'\n'),sha,branch:BRANCH});sha=result.content.sha;posts=next;renderList()}
 // Only delete images owned by this diary and no longer referenced by any article.
@@ -40,7 +110,7 @@ async function deleteUnusedImages(paths,next){
       await api(gitpath,'DELETE',{message:'Delete unused note image '+path,sha:file.sha,branch:BRANCH});
       removedFiles.push(path);
     }catch(e){
-      if(String(e.message||e).includes('GitHub 404:')){removedFiles.push(path);continue}
+      if(e.status===404){removedFiles.push(path);continue}
       failed.push(path+': '+errText(e));
     }
   }
@@ -51,8 +121,69 @@ function cleanupMessage(result){
   return msg+(result.failed.length?'\n一部の画像を削除できませんでした。GitHubの public/note/images/ を確認してください：\n'+result.failed.join('\n'):'');
 }
 
-$('save').onclick=async()=>{if(busy||!token)return;const created=$('created').value;if(!created){status('日時を入力してください',true);return}const files=[...$('images').files];if(files.some(f=>f.size>4*1024*1024)){status('4MBを超える画像があります。縮小してください。',true);return}if(files.some(f=>!['image/png','image/jpeg','image/webp','image/gif'].includes(f.type))){status('対応していない画像形式です。',true);return}setBusy(true);try{const old=posts.find(x=>x.id===editing);const id=editing||('post-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8));const paths=(old?.images||[]).filter(x=>!removed.has(x));for(let i=0;i<files.length;i++){const f=files[i],ext=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif'})[f.type];const name=id.replace(/[^a-zA-Z0-9_-]/g,'-')+'-'+Date.now().toString(36)+'-'+i+'.'+ext;status('画像をアップロード中：'+(i+1)+' / '+files.length);await api(IMAGEDIR+'/'+name,'PUT',{message:'Add note image '+name,content:await fileBase64(f),branch:BRANCH});paths.push('images/'+name)}const p={...(old||{}),id,created:new Date(created).toISOString(),title:$('title').value.trim(),content:$('content').value,category:$('category').value.trim(),tags:$('tags').value.split(/[,、\n]/).map(x=>x.trim()).filter(Boolean),images:paths};const next=editing?posts.map(x=>x.id===editing?p:x):[p,...posts];status('記事データを保存しています…');await writePosts(next,(editing?'Update':'Add')+' note '+id);const clean=await deleteUnusedImages(old?.images||[],next);newPost();status('保存しました。GitHub ActionsがNekowebを更新します。'+cleanupMessage(clean),clean.failed.length>0)}catch(e){status('保存できませんでした：'+errText(e)+'\n画像のみアップロードされた場合は、再度保存してください。',true)}finally{setBusy(false)}};
-$('delete').onclick=async()=>{if(!editing||busy||!token)return;const p=posts.find(x=>x.id===editing);if(!confirm('「'+(p?.title||'無題')+'」を削除しますか？\n記事と、この日記以外で使われていない添付画像を削除します。'))return;setBusy(true);try{const next=posts.filter(x=>x.id!==editing);await writePosts(next,'Delete note '+editing);const clean=await deleteUnusedImages(p?.images||[],next);newPost();status('記事を削除しました。GitHub Actionsが公開先を更新します。'+cleanupMessage(clean),clean.failed.length>0)}catch(e){status(errText(e),true)}finally{setBusy(false)}};
-const storedToken=getStoredToken();if(storedToken){$('token').value=storedToken;$('remember').checked=true;status('この端末に保存されたトークンを入力欄に用意しました。「接続して記事を読み込む」を押してください。')}
+async function uploadNoteImage(image){
+ const content=await fileBase64(image.file);
+ if(image.attempted){
+  let existing;
+  try{existing=await api(image.path,'GET',undefined,true)}
+  catch(error){if(error.status!==404)throw error}
+  if(existing){
+   if(await fileBase64(existing)!==content)throw Error('同名の別画像があります。上書きせず停止しました。');
+   return;
+  }
+ }
+ image.attempted=true;
+ await api(image.path,'PUT',{message:'Add note image '+image.name,content,branch:BRANCH});
+}
+$('save').onclick=async()=>{
+ if(busy||!token)return;
+ if(!pending){
+  const fields=draftFields(),files=[...$('images').files];
+  if(!fields.created){status('日時を入力してください。',true);return}
+  const types={'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif'};
+  if(files.some(file=>file.size>4*1024*1024||!types[file.type])){
+   status('PNG・JPEG・WebP・GIFの画像を1枚4MB以下で選んでください。',true);return;
+  }
+  if([fields.title,fields.content,fields.category,...fields.tags].some(value=>value.includes(token))){
+   status('投稿内容に接続用トークンが含まれています。取り除いてください。',true);return;
+  }
+  const original=posts.find(post=>post.id===editing);
+  const batchId=crypto.randomUUID();
+  const images=files.map((file,index)=>{
+   const name='post-'+batchId+'-'+index+'.'+types[file.type];
+   return {name,path:IMAGEDIR+'/'+name,file};
+  });
+  pending={original,images,post:{...original,...fields,id:original?.id||'post-'+batchId,
+   images:[...(original?.images||[]).filter(path=>!removed.has(path)),...images.map(image=>'images/'+image.name)]}};
+ }
+ setBusy(true);
+ try{
+  const {original,images,post}=pending;
+  let latest=await api(POSTPATH);
+  let current=JSON.parse(decodeBase64Utf8(latest.content));
+  const check=()=>{
+   if(!Array.isArray(current))throw Error('記事一覧の形式を確認してください。');
+   const saved=current.find(item=>item.id===post.id);
+   if(JSON.stringify(saved)===JSON.stringify(post))return true;
+   if(JSON.stringify(saved)!==JSON.stringify(original))throw Error('別の操作で記事が更新されました。入力を確認し、新規記事に戻してから一覧を読み直してください。');
+   return false;
+  };
+  if(!check()){
+   for(const image of images)await uploadNoteImage(image);
+   latest=await api(POSTPATH);current=JSON.parse(decodeBase64Utf8(latest.content));
+   if(!check()){
+    sha=latest.sha;
+    const next=original?current.map(item=>item.id===post.id?post:item):[post,...current];
+    await writePosts(next,(original?'Update':'Add')+' note '+post.id);
+   }else{posts=current;sha=latest.sha;renderList()}
+  }else{posts=current;sha=latest.sha;renderList()}
+  const clean=await deleteUnusedImages(original?.images||[],posts);
+  pending=null;newPost();
+  status('保存しました。GitHub ActionsがNekowebを更新します。'+cleanupMessage(clean),clean.failed.length>0);
+ }catch(error){status('保存できませんでした。入力と画像を保持しています。'+errText(error),true)}
+ finally{setBusy(false)}
+};
+$('delete').onclick=async()=>{if(!editing||busy||pending||!token)return;const p=posts.find(x=>x.id===editing);if(!confirm('「'+(p?.title||'無題')+'」を削除しますか？\n記事と、この日記以外で使われていない添付画像を削除します。'))return;setBusy(true);try{const next=posts.filter(x=>x.id!==editing);await writePosts(next,'Delete note '+editing);const clean=await deleteUnusedImages(p?.images||[],next);newPost();status('記事を削除しました。GitHub Actionsが公開先を更新します。'+cleanupMessage(clean),clean.failed.length>0)}catch(e){status(errText(e),true)}finally{setBusy(false)}};
+const storedToken=getStoredToken();if(storedToken===null){status('このブラウザの保存領域を読み込めませんでした。',true)}else if(storedToken){$('token').value=storedToken;$('remember').checked=true;status('この端末に保存されたトークンを入力欄に用意しました。「接続して記事を読み込む」を押してください。')}
 window.addEventListener('pagehide',()=>{token=''});
 </script></body></html>
