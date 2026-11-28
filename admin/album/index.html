@@ -43,8 +43,12 @@ function renderReview(){
  if(files.some(file=>file.size>8*1024*1024||!imageTypes[file.type])){
   status('PNG・JPEG・WebP・GIFの画像を1枚8MB以下で選んでください。',true);return;
  }
+ const title=$('title').value.trim(),descriptionText=$('description').value;
+ if(token&&[title,descriptionText].some(value=>value.includes(token))){
+  status('投稿内容に接続用トークンが含まれています。取り除いてください。',true);return;
+ }
  releasePreview();
- review={files,title:$('title').value.trim(),description:$('description').value};
+ review={files,title,description:descriptionText};
  $('preview-button').setAttribute('aria-expanded','true');
  const panel=$('preview'),heading=document.createElement('h3'),description=document.createElement('p');
  heading.textContent=review.title||'（タイトルなし）';
@@ -71,7 +75,7 @@ async function api(path,method='GET',body,raw=false){
   method,headers:{Accept:raw?'application/vnd.github.raw+json':'application/vnd.github+json',
    Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28',
    ...(body?{'Content-Type':'application/json'}:{})},
-  body:body?JSON.stringify(body):undefined,cache:'no-store',signal:AbortSignal.timeout(30000)
+  body:body?JSON.stringify(body):undefined,cache:'no-store',signal:globalThis.AbortSignal?.timeout?.(30000)
  });
  if(!response.ok){
   const description={401:'トークンを確認してください。',403:'権限またはAPIの利用制限を確認してください。',
@@ -209,7 +213,7 @@ $('connect').onclick=async()=>{
   }
   $('editor').classList.remove('hidden');$('listing').classList.remove('hidden');
   status(storageWarning||(pending?'接続しました。同じ内容で再試行できます。':'GitHubに接続しました。'),!!storageWarning);
-  try{if($('remember').checked)localStorage.setItem(KEY,candidate);else localStorage.removeItem(KEY)}
+  try{if($('remember').checked){localStorage.setItem(KEY,candidate);if(!pending&&!storageWarning)status('接続しました。トークンをこの端末に記憶しました。')}}
   catch{status('接続しました。端末のトークン保存設定は更新できませんでした。',true)}
  }catch(error){token=previous;status(error.message,true)}
  finally{setBusy(false)}
